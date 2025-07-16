@@ -18,19 +18,43 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
 import com.example.tp3_petshop.components.TopBarSection
+import com.example.tp3_petshop.models.FavoriteProductDto
+import com.example.tp3_petshop.viewmodel.CartViewModel
+import com.example.tp3_petshop.viewmodel.FavoriteProductViewModel
 import com.example.tp3_petshop.viewmodel.ProductViewModel
+import com.example.tp3_petshop.viewmodel.SessionViewModel
 
 @Composable
-fun DetailView(productId: Int, navController: NavController, viewModel: ProductViewModel = viewModel()) {
+fun DetailView(
+    productId: Int,
+    navController: NavController,
+    viewModel: ProductViewModel = hiltViewModel(),
+    favoriteViewModel: FavoriteProductViewModel = hiltViewModel(),
+    cartViewModel: CartViewModel = hiltViewModel(),
+    sessionViewModel: SessionViewModel
+) {
+    val userId by sessionViewModel.userId.collectAsState()
     val product by viewModel.selectedProduct.collectAsState()
-    var quantity by remember { mutableStateOf(1) }
+    var quantity by remember { mutableStateOf(1) } // local state para la cantidad de items a agregar
+    val favorite by favoriteViewModel.favoriteById.collectAsState()
+    fun addToCart() {
+        if (product != null) {
+            cartViewModel.addProductToCart(productId = product!!.id, quantity = quantity)
+        }
+        navController.navigate("cart")
+    }
 
     LaunchedEffect(productId) {
         viewModel.fetchProductById(productId)
+        favoriteViewModel.getByProductId(productId)
+        if (userId != null) {
+            cartViewModel.setUserId(userId)
+            cartViewModel.getCart()
+        }
     }
 
     if (product != null) {
@@ -49,8 +73,15 @@ fun DetailView(productId: Int, navController: NavController, viewModel: ProductV
                     TopBarSection(
                         title = "Product Detail",
                         showFavorite = true,
+                        isFavorite = favorite != null,
                         onBackClick = { navController.popBackStack() },
-                        onFavoriteClick = { /* TODO: marcar favorito */ }
+                        onFavoriteClick = {
+                            if (favorite != null) {
+                                favoriteViewModel.deleteFavorite(favorite!!)
+                            } else {
+                                favoriteViewModel.saveFavorite(FavoriteProductDto(productId = productId))
+                            }
+                        }
                     )
 
                     Column(
@@ -129,7 +160,7 @@ fun DetailView(productId: Int, navController: NavController, viewModel: ProductV
                             }
 
                             Text(
-                                text = "$${"%.2f".format(product!!.price)}",
+                                text = "$${"%.2f".format(product!!.price * quantity)}",
                                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold)
                             )
                         }
@@ -137,7 +168,19 @@ fun DetailView(productId: Int, navController: NavController, viewModel: ProductV
 
                     // Botón Add to Cart
                     Button(
-                        onClick = { /* TODO */ },
+                        onClick = {
+                            if (userId != null && product != null) {
+                                cartViewModel.setUserId(userId)
+                                cartViewModel.addProductToCart(
+                                    productId = product!!.id,
+                                    quantity = quantity
+                                ) {
+                                    navController.navigate("cart") {
+                                        popUpTo("cart") { inclusive = true }
+                                    }
+                                }
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -155,5 +198,4 @@ fun DetailView(productId: Int, navController: NavController, viewModel: ProductV
         }
     }
 }
-
 

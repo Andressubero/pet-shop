@@ -18,7 +18,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.tp3_petshop.models.CartProductDetail
 
 @Composable
-fun CartItem(product: CartProductDetail, onDeleteClick: () -> Unit) {
+fun CartItem(product: CartProductDetail, onDeleteClick: (Int) -> Unit) {
     Card(
         modifier = Modifier
             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -40,15 +40,15 @@ fun CartItem(product: CartProductDetail, onDeleteClick: () -> Unit) {
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(product.title, style = MaterialTheme.typography.titleMedium)
-                Text("Cantidad: ${product.quantity}", color = Color.Gray)
+                Text("Quantity: ${product.quantity}", color = Color.Gray)
                 Text(
                     "$${product.price}",
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF735BF2)
                 )
             }
-            IconButton(onClick = onDeleteClick) {
-                Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color.Red)
+            IconButton(onClick = { onDeleteClick(product.id) }) {
+            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red)
             }
         }
     }

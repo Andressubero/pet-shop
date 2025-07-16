@@ -26,6 +26,15 @@ import com.example.tp3_petshop.R
 import com.example.tp3_petshop.components.ButtonAuthComp
 import com.example.tp3_petshop.components.FormAuth
 import com.example.tp3_petshop.ui.theme.TP3PETSHOPTheme
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.AuthResult
+import kotlinx.coroutines.launch
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.tasks.await
 
 @Composable
 fun RegisterView(navController: NavController? = null) {
@@ -34,8 +43,19 @@ fun RegisterView(navController: NavController? = null) {
     var password by remember { mutableStateOf("") }
     var agreedToTerms by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val auth = FirebaseAuth.getInstance()
 
     val isButtonEnabled = fullName.isNotBlank() && email.isNotBlank() && password.isNotBlank() && agreedToTerms
+
+    suspend fun getNextUserId(): Int {
+        val db = Firebase.firestore
+        val snapshot = db.collection("user_mappings").get().await()
+        val maxId = snapshot.documents.mapNotNull { it.getLong("userId") }.maxOrNull() ?: 0L
+        return (maxId + 1).toInt()
+    }
 
     Column(
         modifier = Modifier
@@ -81,7 +101,7 @@ fun RegisterView(navController: NavController? = null) {
             ) {
                 Checkbox(
                     checked = agreedToTerms,
-                    onCheckedChange = { agreedToTerms = it },
+                    onCheckedChange = { agreedToTerms = it }
                 )
                 val annotatedString = buildAnnotatedString {
                     withStyle(style = SpanStyle(color = Color.Gray)) {
@@ -99,8 +119,7 @@ fun RegisterView(navController: NavController? = null) {
                 }
                 Text(
                     text = annotatedString,
-                    modifier = Modifier.clickable {
-                    }
+                    modifier = Modifier.clickable { }
                 )
             }
 
@@ -121,8 +140,48 @@ fun RegisterView(navController: NavController? = null) {
         }
 
         ButtonAuthComp(
-            text = "Get Started",
-            onClick =  {},
+            text = if (loading) "Registrando..." else "Get Started",
+            onClick = {
+                loading = true
+                scope.launch {
+                    try {
+                        // creamos usuario en Firebase
+                        val authResult = auth.createUserWithEmailAndPassword(email, password).await()
+                        val uid = authResult.user?.uid
+                        if (uid != null) {
+                            val userId = getNextUserId()
+                            val mapping = hashMapOf("userId" to userId)
+                            // Guarda el mapping
+                            Firebase.firestore.collection("user_mappings")
+                                .document(uid)
+                                .set(mapping)
+                                .await()
+                            // Inicializa el carrito default
+                            Firebase.firestore.collection("carts")
+                                .document(userId.toString())
+                                .set(
+                                    hashMapOf(
+                                        "id" to userId,
+                                        "products" to emptyList<Map<String, Any>>(), // lista vacía sin productos
+                                        "total" to 0.0,
+                                        "totalProducts" to 0,
+                                        "totalQuantity" to 0
+                                    )
+                                )
+                                .await()
+                            Toast.makeText(context, "Registro exitoso", Toast.LENGTH_SHORT).show()
+
+                            // Navegamos al home y eliminamos la ruta /register
+                            navController?.navigate("homeScreen") {
+                                popUpTo("register") { inclusive = true }
+                            }
+                        }
+                    } catch (e: Exception) {
+                        loading = false
+                        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            },
             enabled = isButtonEnabled
         )
 
@@ -137,4 +196,3 @@ fun RegisterViewPreview() {
         RegisterView()
     }
 }
-

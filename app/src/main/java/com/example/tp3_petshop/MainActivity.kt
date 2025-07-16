@@ -4,14 +4,18 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.NavType
 import com.example.tp3_petshop.ui.theme.TP3PETSHOPTheme
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.example.tp3_petshop.viewmodel.SessionViewModel
 import com.example.tp3_petshop.views.AccountView
 import com.example.tp3_petshop.views.CartView
 import com.example.tp3_petshop.views.BestSellerView
@@ -41,10 +45,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val sessionViewModel: SessionViewModel by viewModels()
         setContent {
             TP3PETSHOPTheme {
                 val navController = rememberNavController()
-                NavHost(navController = navController, startDestination = "homeScreen") {
+                NavHost(navController = navController, startDestination = "initial") {
                     composable("initial") {
                         SplashView(
                             onGetStartedClick = {
@@ -65,7 +70,7 @@ class MainActivity : ComponentActivity() {
                             },
                         )
                     }
-                    composable("profileView") {
+                    composable("profileView")   {
                         ProfileView(
                             fun(route: String) {
                                 navController.navigate(route)
@@ -125,11 +130,11 @@ class MainActivity : ComponentActivity() {
                     composable("detail/{productId}") { backStackEntry ->
                         val productId = backStackEntry.arguments?.getString("productId")?.toIntOrNull()
                         if (productId != null) {
-                            DetailView(productId = productId, navController = navController)
+                            DetailView(productId = productId, navController = navController, sessionViewModel = sessionViewModel)
                         }
                     }
                     composable("cart") {
-                        CartView(navController = navController)
+                        CartView(navController = navController, sessionViewModel = sessionViewModel)
                     }
 
                     composable("changePasswordView") {
@@ -156,8 +161,20 @@ class MainActivity : ComponentActivity() {
                     composable("payment") {
                         ChoosePaymentView(navController)
                     }
-                    composable("paysuccess") {
-                        PaymentSuccessView(navController)
+
+                    composable(
+                        "paysuccess/{paymentMethod}",
+                        arguments = listOf(navArgument("paymentMethod") { type = NavType.StringType })
+                    ) { backStackEntry ->
+                        val method = backStackEntry.arguments?.getString("paymentMethod") ?: ""
+                        PaymentSuccessView(
+                            navController = navController,
+                            paymentMethod = method,
+                            sessionViewModel = sessionViewModel
+                        )
+//                    composable("paysuccess") {
+//                        PaymentSuccessView(navController)
+//                    }
                     }
                     composable("searchView") {
                         SearchView(

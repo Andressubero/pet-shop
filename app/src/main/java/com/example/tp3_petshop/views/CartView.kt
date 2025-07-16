@@ -14,17 +14,39 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.example.tp3_petshop.components.CartItemList
 import com.example.tp3_petshop.viewmodel.CartViewModel
+import com.example.tp3_petshop.viewmodel.SessionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CartView(navController: NavController, viewModel: CartViewModel = viewModel()) {
-    val cart by viewModel.cart.collectAsState()
+fun CartView(
+    navController: NavController,
+    sessionViewModel: SessionViewModel
+
+) {
+    val userId by sessionViewModel.userId.collectAsState()
+    val cartViewModel: CartViewModel = hiltViewModel()
+    val cart by cartViewModel.cart.collectAsState()
     val isCartEmpty = cart?.products.isNullOrEmpty()
-    var showDialog by remember { mutableStateOf(false) }
+
+    fun onCheckout() {
+        cartViewModel.persistCart {
+            navController.navigate("payment")
+        }
+    }
+
+    // Cuando carga el Composable, si el ID es valido, seteamos y pedimos el cart
+    LaunchedEffect(userId) {
+        println("CartView: userId = $userId")
+        if (userId != null && userId!! > 0) {
+            cartViewModel.setUserId(userId)
+            cartViewModel.getCart()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -81,7 +103,7 @@ fun CartView(navController: NavController, viewModel: CartViewModel = viewModel(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
-                        onClick = { showDialog = true },
+                        onClick = { onCheckout() },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(56.dp),
@@ -95,6 +117,7 @@ fun CartView(navController: NavController, viewModel: CartViewModel = viewModel(
         }
     ) { innerPadding ->
         when {
+            // Loader
             cart == null -> {
                 Box(
                     modifier = Modifier
@@ -113,36 +136,45 @@ fun CartView(navController: NavController, viewModel: CartViewModel = viewModel(
                         .padding(innerPadding),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Tu carrito está vacío.")
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Your cart is empty!",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF735BF2)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { navController.navigate("homeScreen") },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF735BF2)),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .height(48.dp)
+                                .width(200.dp)
+                        ) {
+                            Text(
+                                text = "Continue Shopping",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color.White
+                            )
+                        }
+                    }
                 }
             }
 
+            // Si no esta vacio mostramos la lista y le mandamos el onDelete click al ViewModel
             else -> {
                 CartItemList(
                     products = cart?.products ?: emptyList(),
-                    onDeleteClick = { product -> viewModel.removeProduct(product.id) },
+                    onDeleteClick = { productId -> cartViewModel.removeProduct(productId) },
                     modifier = Modifier.padding(innerPadding)
                 )
             }
         }
     }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("¡Gracias por tu compra!") },
-            text = { Text("Tu pedido fue procesado correctamente.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDialog = false
-                    navController.popBackStack()
-                }) {
-                    Text("Aceptar")
-                }
-            },
-            containerColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
-    }
 }
 
